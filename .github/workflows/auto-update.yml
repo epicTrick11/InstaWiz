@@ -1,0 +1,57 @@
+name: Instawiz Auto-Update
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * 1'  # Runs every Monday at midnight
+  workflow_dispatch:  # Allows you to trigger it manually
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v17
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y apktool zipalign wget apksigner curl
+
+      - name: Get Latest Instagram APK URL
+        run: |
+          LATEST_URL=$(curl -s "https://www.apkmirror.com/apk/instagram/instagram-instagram-release/" | grep -o 'https://www.apkmirror.com/apk/instagram/instagram-instagram-release/[0-9A-Za-z_-]\+/download/' | head -n 1)
+          echo "Downloading from: $LATEST_URL"
+          wget -O instagram.apk "$LATEST_URL"
+
+      - name: Decompile APK
+        run: apktool d -f -o instawiz_decompiled instagram.apk
+
+      - name: Modify APK (Enable Developer Options)
+        run: |
+          sed -i 's/dev_mode=false/dev_mode=true/g' instawiz_decompiled/res/values/config.xml
+
+      - name: Recompile APK
+        run: apktool b instawiz_decompiled -o Instawiz_Alpha.apk
+
+      - name: Sign APK
+        run: |
+          echo ${{ secrets.KEYSTORE_BASE64 }} | base64 --decode > instawiz.keystore
+          apksigner sign --ks instawiz.keystore --ks-pass pass:${{ secrets.KEYSTORE_PASS }} Instawiz_Alpha.apk
+
+      - name: Upload APK to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: Instawiz_Alpha.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
