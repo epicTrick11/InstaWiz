@@ -29,9 +29,17 @@ jobs:
 
       - name: Get Latest Instagram APK URL
         run: |
-          LATEST_URL=$(curl -s "https://www.apkmirror.com/apk/instagram/instagram-instagram-release/" | grep -o 'https://www.apkmirror.com/apk/instagram/instagram-instagram-release/[0-9A-Za-z_-]\+/download/' | head -n 1)
-          echo "Downloading from: $LATEST_URL"
-          wget -O instagram.apk "$LATEST_URL"
+          LATEST_PAGE=$(curl -s "https://www.apkmirror.com/apk/instagram/instagram-instagram-release/")
+          LATEST_URL=$(echo "$LATEST_PAGE" | grep -oP '(?<=href=")/apk/instagram/instagram-instagram-release/[^"]+/download/' | head -n 1)
+
+          if [ -z "$LATEST_URL" ]; then
+            echo "Error: Could not find the latest Instagram APK URL!"
+            exit 1
+          fi
+
+          FULL_URL="https://www.apkmirror.com$LATEST_URL"
+          echo "Downloading from: $FULL_URL"
+          wget -O instagram.apk "$FULL_URL"
 
       - name: Decompile APK
         run: apktool d -f -o instawiz_decompiled instagram.apk
